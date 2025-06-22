@@ -1,0 +1,15 @@
+{
+  "rule": {
+    "dispatchRuleIndividual": {
+      "roomPrefix": "default-room"
+    }
+  },
+  "roomConfig": {
+    "agents": [
+      {
+        "agentName": "adaptive-multimodal-agent",
+        "metadata": "job dispatch metadata"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "trunk": {
+    "name": "My outbound trunk",
+    "address": "multimodalagent.pstn.twilio.com",
+    "numbers": ["+17742925199"],
+    "auth_username": "multimodal",
+    "auth_password": "e7kA8f4P77D52qt4Xg"
+  }
+}

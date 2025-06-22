@@ -1,0 +1,7 @@
+# Core functionality
+python-dotenv
+livekit-agents[deepgram,openai,silero]==1.0
+livekit==0.19.0
+
+# Optional local plugins
+livekit-plugins-noise-cancellation~=0.2
