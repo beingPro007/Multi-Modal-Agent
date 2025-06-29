@@ -7,14 +7,13 @@ import { LiveKitRoom, useDataChannel } from "@livekit/components-react";
 function InnerChatUI() {
   const { message: incoming, send } = useDataChannel<string>(
     "lk.chat",
-    (msg) => {} // we'll handle in state below
+    (msg) => {} 
   );
   const [message, setMessage] = useState("");
   const [chatLog, setChatLog] = useState<any[]>([]);
   const [participantInfo, setParticipantInfo] = useState<Record<string, any>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Append incoming messages
   useEffect(() => {
     if (!incoming) return;
     const { from, payload } = incoming;
@@ -41,7 +40,6 @@ function InnerChatUI() {
     }));
   }, [incoming]);
 
-  // Scroll on new message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatLog]);
