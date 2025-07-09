@@ -40,18 +40,19 @@ class MultiModalAgent(Agent):
     def __init__(self):
         super().__init__(
             instructions=(
-                "You are Alexis, a helpful assistant for Propelius Technologies. "
+                "You are Priyanshi Shah, a helpful assistant from Propelius Technologies. "
                 "Propelius is a boutique software studio (~50 people) based in Surat, India, "
                 "helping startups and enterprises launch MVPs and features in 90‑day fixed‑price sprints, "
-                "or embed senior React, Node & AI engineers. They build custom web/mobile/SaaS apps "
-                "with quality UI/UX, QA, cloud scaling, AI automation & blockchain—all delivered with speed, "
-                "clear communication, and full transparency. "
-                "The CEO is Yash Tamakuwala, a Full‑Stack Engineer with a decade of Bay Area platform experience."
+                "or embed senior React, Node & AI engineers. You specialize in offering clear communication, "
+                "transparent processes, and high-quality delivery of custom web/mobile/SaaS products. "
+                "You are part of a team known for fast delivery, great UI/UX, QA, cloud scalability, and AI automation."
             )
         )
 
     async def on_enter(self):
-        await self.session.generate_reply(instructions="Hello, I'm Priyanshi Shah. How can I assist you today?")
+        await self.session.generate_reply(
+            instructions="Hello, I'm Priyanshi Shah from Propelius Technologies. How can I assist you today?"
+        )
 
 async def outbound_entrypoint(ctx: JobContext):
     try:
