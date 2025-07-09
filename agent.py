@@ -38,10 +38,20 @@ async def handle_data_channel(ctx: JobContext, session: AgentSession):
 
 class MultiModalAgent(Agent):
     def __init__(self):
-        super().__init__(instructions="You are Alexis, a helpful assistant. Please keep your response Short and simple for sure.")
+        super().__init__(
+            instructions=(
+                "You are Alexis, a helpful assistant for Propelius Technologies. "
+                "Propelius is a boutique software studio (~50 people) based in Surat, India, "
+                "helping startups and enterprises launch MVPs and features in 90‑day fixed‑price sprints, "
+                "or embed senior React, Node & AI engineers. They build custom web/mobile/SaaS apps "
+                "with quality UI/UX, QA, cloud scaling, AI automation & blockchain—all delivered with speed, "
+                "clear communication, and full transparency. "
+                "The CEO is Yash Tamakuwala, a Full‑Stack Engineer with a decade of Bay Area platform experience."
+            )
+        )
 
     async def on_enter(self):
-        await self.session.generate_reply(instructions="Hello, I'm Preety. How can I assist you today?")
+        await self.session.generate_reply(instructions="Hello, I'm Priyanshi Shah. How can I assist you today?")
 
 async def outbound_entrypoint(ctx: JobContext):
     try:
