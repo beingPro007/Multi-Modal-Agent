@@ -34,11 +34,14 @@ export default function DemoForm() {
     };
 
     try {
-      const res = await fetch("http://localhost:8000/start_call", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        "https://3d6222bc075b.ngrok-free.app/start_call",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
       const json = await res.json();
 
       if (!res.ok) {
