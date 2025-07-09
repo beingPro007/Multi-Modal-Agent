@@ -17,15 +17,11 @@ export const metadata: Metadata = {
   description: "Created With Love",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="h-full">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`flex min-h-full flex-col bg-[#f8f3e9] ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
       </body>

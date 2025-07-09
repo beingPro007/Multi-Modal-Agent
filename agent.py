@@ -4,8 +4,8 @@ import json
 from dotenv import load_dotenv
 import time
 
-from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, RoomInputOptions, ChatContext, ChatMessage, ChatRole, cli, JobProcess, AutoSubscribe, RoomOutputOptions, UserInputTranscribedEvent
-from livekit.plugins import deepgram, silero, aws, openai, noise_cancellation
+from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, RoomInputOptions, cli, JobProcess, AutoSubscribe, RoomOutputOptions
+from livekit.plugins import deepgram, silero, aws, openai, noise_cancellation, cartesia
 from livekit.rtc import DataPacket
 from livekit.plugins.turn_detector.english import EnglishModel
 from livekit import api
@@ -22,72 +22,33 @@ async def handle_data_channel(ctx: JobContext, session: AgentSession):
             try:
                 text = packet.data.decode("utf-8")
                 print("[DATA RECEIVED]", text)
-
                 session.history.add_message(role="user", content=[text])
+                await session._agent.update_chat_ctx(session.history)
 
-                response = await generate_modality_aware_response(session, input_modality="text")
+                full_resp = ""
+                async for chunk in session.llm.chat(chat_ctx=session.history):
+                    if getattr(chunk, 'delta', None) and getattr(chunk.delta, 'content', None):
+                        full_resp += chunk.delta.content
 
-                # Step 3: Respond based on modality
-                if response["output_modality"] == "voice":
-                    print("NEED TO SAY")
-                    await session.say(response["message"])
-                else:
-                    print("NEED TO SEND TO CHAT")
-                    await ctx.room.local_participant.publish_data(
-                        json.dumps(response), reliable=True, topic="lk.chat"
-                    )
+                await ctx.room.local_participant.publish_data(full_resp, reliable=True, topic="lk.chat")
             except Exception as e:
                 print("Error in data channel:", e)
         asyncio.create_task(process_data())
     return data_handler
 
-
-
-async def generate_modality_aware_response(session: AgentSession, input_modality: str):
-    try:
-        await session._agent.update_chat_ctx(session.history)
-        
-        prompt = (
-            "You are an assistant choosing between voice or chat delivery. "
-            f"User input modality: '{input_modality}'. "
-            "Default to voice unless content is sensitive (passwords, OTPs, tokens). "
-            "Use chat only if security reasons or user explicitly requests chat. "
-            "Respond strictly with valid JSON: {\"output_modality\": \"voice\" or \"chat\", \"message\": \"...\"}."
-        )
-        system_msg = ChatMessage(role="system", content=[prompt])
-        ctx = ChatContext(items=[system_msg] + session.history.items.copy())
-
-
-        full_response = ""
-        async for chunk in session.llm.chat(chat_ctx=ctx):
-            if getattr(chunk, "delta", None) and getattr(chunk.delta, "content", None):
-                full_response += chunk.delta.content
-
-        print("Raw response from LLM:", full_response)
-
-        return json.loads(full_response)
-
-    except Exception as e:
-        print("Error generating modality-aware response:", e)
-        return {"output_modality": "chat", "message": "Sorry, something went wrong while generating a response."}
-
 class MultiModalAgent(Agent):
     def __init__(self):
-        super().__init__(
-            instructions="You are Gautam Rana, a helpful assistant.",
-            stt=deepgram.STT(),
-            llm=openai.LLM.with_cerebras(model="llama3.1-8b", temperature=0.1),
-            tts=aws.TTS(voice="Ruth", speech_engine="neural", language="en-US"),
-        )
+        super().__init__(instructions="You are Alexis, a helpful assistant. Please keep your response Short and simple for sure.")
 
     async def on_enter(self):
-        await self.session.generate_reply(instructions="Hello, How can I assist you today?")
+        await self.session.generate_reply(instructions="Hello, I'm Preety. How can I assist you today?")
 
 async def outbound_entrypoint(ctx: JobContext):
     try:
         await ctx.connect(auto_subscribe=AutoSubscribe.SUBSCRIBE_ALL)
         print("Connected to room:", ctx.room.name)
 
+        # Initiate SIP call
         metadata = json.loads(ctx.job.metadata or "{}")
         phone = metadata.get("phone_number")
         if not phone:
@@ -115,15 +76,21 @@ async def outbound_entrypoint(ctx: JobContext):
                 return
             await asyncio.sleep(0.5)
 
+        # Create a fresh AgentSession per call
         session = AgentSession(
+            stt=deepgram.STT(),
+            llm=openai.LLM.with_cerebras(model="llama3.1-8b", temperature=0.1),
+            tts=cartesia.TTS(),
             vad=ctx.proc.userdata["vad"],
             turn_detection=EnglishModel()
         )
 
+        # Subscribe to track events correctly
         def on_track_subscribed(participant, track):
             print(f"Track subscribed: {track.name}, kind={track.kind}")
         ctx.room.on("track_subscribed", on_track_subscribed)
 
+        # Start session with audio enabled explicitly
         await session.start(
             room=ctx.room,
             agent=MultiModalAgent(),
@@ -132,33 +99,23 @@ async def outbound_entrypoint(ctx: JobContext):
                 text_enabled=True,
                 noise_cancellation=noise_cancellation.BVC()
             ),
+            room_output_options=RoomOutputOptions(transcription_enabled=True)
         )
 
+        # Log transcriptions
         @session.on("user_input_transcribed")
-        def on_user_input_transcribed(event: UserInputTranscribedEvent):
-            print(f"User input transcribed: {event.transcript}, final: {event.is_final}, speaker id: {event.speaker_id}")
-            if event.is_final:
-                session.history.add_message(role="user", content=[event.transcript])
-                
-                async def process():
-                    response = await generate_modality_aware_response(session, input_modality="voice")
-                    
-                    if response["output_modality"] == "voice":
-                        print("NEED TO SAY")
-                        await session.say(response["message"])
-                    else:
-                        print("NEED TO SEND TO CHAT")
-                        await ctx.room.local_participant.publish_data(
-                            json.dumps(response), reliable=True, topic="lk.chat"
-                        )
-                asyncio.create_task(process())
-                
+        def on_transcribed(evt):
+            print("RECOGNIZED:", evt.transcript, "final?", evt.is_final)
+
+        # Handle data channel
         ctx.room.on("data_received", await handle_data_channel(ctx, session))
 
+        # Clean up on disconnect using a synchronous handler that schedules an async task
         def on_disconnect(participant):
             if participant.identity == user_id:
                 print("SIP participant disconnected, scheduling cleanup.")
                 async def cleanup():
+                    # Gracefully shutdown the agent session via LiveKit context
                     try:
                         ctx.shutdown(reason="participant_disconnected")
                         print("Context shutdown initiated.")
@@ -166,30 +123,8 @@ async def outbound_entrypoint(ctx: JobContext):
                         print("Error during shutdown:", e)
                 asyncio.create_task(cleanup())
         ctx.room.on("participant_disconnected", on_disconnect)
-        
     except Exception as e:
         print(f"Eror occured {e}")
-
-
-async def webrtc_entrypoint(ctx: JobContext):
-    session = AgentSession(
-            vad=ctx.proc.userdata["vad"],
-            turn_detection=EnglishModel()
-    )
-    
-    try:
-        await session.start(
-                room=ctx.room,
-                agent=MultiModalAgent(),
-                room_input_options=RoomInputOptions(
-                    audio_enabled=True,
-                    text_enabled=True,
-                    noise_cancellation=noise_cancellation.BVC()
-                ),
-        )
-    except Exception as e:
-        print(f"Session failed to start: {e}")
-
 
 def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
