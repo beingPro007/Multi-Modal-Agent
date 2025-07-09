@@ -29,6 +29,10 @@ class CallRequest(BaseModel):
 import os
 import sys
 
+@app.get("/status")
+async def status():
+    return {"status": "Agent server is running", "agent_name": AGENT_NAME}
+
 @app.post("/start_call")
 async def start_call(req: CallRequest):
     if os.getenv("RUN_MAIN") and os.getenv("RUN_MAIN") != "true":
