@@ -4,9 +4,6 @@ python-dotenv
 aiohttp>=3.8.0
 annoy
 sentence-transformers
-uvicorn
-fastapi
 langchain>=0.2
 langchain-community>=0.0.15
 sentence-transformers
-faiss-cpu
