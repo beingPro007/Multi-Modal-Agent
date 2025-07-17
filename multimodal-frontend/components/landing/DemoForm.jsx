@@ -50,7 +50,7 @@ export default function DemoForm() {
 
       setIsError(false);
       setResponseMessage(
-        "✅ Call started! Server response: " + JSON.stringify(json)
+        "✅ Call started!"
       );
     } catch (err) {
       setIsError(true);

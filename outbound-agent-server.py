@@ -56,7 +56,8 @@ async def start_call(req: CallRequest):
         
         env = os.environ.copy()
         env["LIVEKIT_URL"] = "wss://webrtc-agent-qllsubgf.livekit.cloud"
-        env["api_key"] = "APIzKZRxx5JobkB"
+        env["LIVEKIT_API_KEY"] = "APIzKZRxx5JobkB"
+        env["LIVEKIT_API_SECRET"] = "rXQiA5hmKn6NmUdjRY6v2Gxe1gSuxntxtBlSURW24XY"
         
         result = subprocess.run(cmd, capture_output=True, text=True, env=env)
 
