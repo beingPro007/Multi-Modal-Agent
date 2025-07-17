@@ -26,8 +26,9 @@ export default function LandingPage() {
         <DemoForm />
         <FinalCTA />
         <ContactForm />
+        <JoinRoomFAB/>
+        <Footer />
       </main>
-      <Footer />
     </div>
   );
 }
