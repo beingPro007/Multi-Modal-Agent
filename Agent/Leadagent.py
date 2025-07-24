@@ -38,7 +38,7 @@ class LeadAgent(Agent):
         super().__init__(
             instructions=_default_instruction,
             stt=deepgram.STT(),
-            llm=openai.LLM.with_cerebras(model="llama3.1-8b", temperature=0.1),
+            llm=openai.LLM(model="gpt-4o-mini"),
             tts=aws.TTS(voice="Matthew", speech_engine="neural", language="en-US")
         )
 
