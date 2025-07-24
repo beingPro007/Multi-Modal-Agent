@@ -1,20 +1,19 @@
-FROM python:3.13-slim
+FROM ubuntu:22.04
 
-# Set working directory
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install git, python, and cleanup
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    git \
+    python3 \
+    python3-pip \
+    curl \
+    && apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential ffmpeg git \
-    && rm -rf /var/lib/apt/lists/*
+COPY cd ..
 
-ENV VENV_PATH=/opt/venv
-RUN python -m venv $VENV_PATH
-ENV PATH="$VENV_PATH/bin:$PATH"
-
-COPY requirements.txt .
-RUN $VENV_PATH/bin/pip install --upgrade pip \
-    && $VENV_PATH/bin/pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-CMD ["python", "agent.py", "dev"]
+CMD ["python" "agent.py" "dev"]

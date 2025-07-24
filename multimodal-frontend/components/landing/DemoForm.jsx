@@ -35,7 +35,7 @@ export default function DemoForm() {
 
     try {
       const res = await fetch(
-        "https://3d6222bc075b.ngrok-free.app/start_call",
+        `${process.env.NEXT_PUBLIC_DISPATCH_URL}/start_call`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
