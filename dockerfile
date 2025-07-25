@@ -1,23 +1,24 @@
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /app
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    git \
-    python3 \
-    python3-pip \
-    python3-venv \
-    curl \
-    && apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    git python3 python3-pip python3-venv \
+    curl build-essential \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+    RUN python3 -m venv /app/venv
+
+ENV PATH="/app/venv/bin:$PATH" 
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN python3 -m venv /app/venv
+RUN python rag_build/build_rag_data.py
 
-RUN . /app/venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
-
-CMD ["/app/venv/bin/python", "agent.py", "dev"]
+CMD ["python", "agent.py", "dev"]
