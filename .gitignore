@@ -4,4 +4,3 @@ inbound-trunk.json
 KMS
 __pycache__/
 Agent/__pycache__/
-rag_build/rag_index
