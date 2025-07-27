@@ -1,4 +1,4 @@
-livekit-agents[openai,silero,turn-detector,deepgram, aws]~=1.0
+livekit-agents[cartesia,openai,silero,turn-detector,deepgram,aws,langchain]~=1.0
 livekit-plugins-noise-cancellation~=0.2
 python-dotenv
 aiohttp>=3.8.0
@@ -7,3 +7,7 @@ annoy
 langchain>=0.2
 langchain-community>=0.0.15
 openai
+chromadb
+tavily-python
+duckduckgo-search
+tiktoken

@@ -35,7 +35,9 @@ RUN python rag_build/build_rag_data.py
 RUN python agent.py download-files
 
 COPY entrypoint.sh /app/entrypoint.sh
+
 RUN chmod +x /app/entrypoint.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD []
+
+CMD ["python" "agent.py" "dev"]

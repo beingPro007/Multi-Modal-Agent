@@ -1,7 +1,7 @@
 from livekit.agents import cli, WorkerOptions, JobContext, AgentSession, JobProcess, RoomInputOptions
 from livekit.plugins import deepgram, silero, openai, noise_cancellation, aws
 # from livekit.plugins.turn_detector.english import EnglishModel
-from Agent.Leadagent import LeadAgent
+from Agent.LeadAgent.Leadagent import LeadAgent
 from dotenv import load_dotenv
 import logging
 logging.basicConfig(level=logging.INFO)
