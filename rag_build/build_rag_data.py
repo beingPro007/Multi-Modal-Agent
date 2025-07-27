@@ -20,24 +20,23 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 INDEX_FILE = OUT_DIR / "index.annoy"
 METADATA_FILE = OUT_DIR / "metadata.pkl"
 
-from sentence_transformers import SentenceTransformer
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
+# from sentence_transformers import SentenceTransformer
+# embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-# === Optional: OpenAI Setup (if you want to use it later) ===
-# from openai import OpenAI
-# client = OpenAI()
-# MODEL = "text-embedding-3-small"
-# EMBED_DIM = 1536
+from openai import OpenAI
+client = OpenAI()
+MODEL = "text-embedding-3-small"
+EMBED_DIM = 1536
 
-# def embed_text_openai(text: str) -> list[float]:
-#     response = client.embeddings.create(
-#         model=MODEL,
-#         input=[text],
-#     )
-#     return response.data[0].embedding
+def embed_text_openai(text: str) -> list[float]:
+    response = client.embeddings.create(
+        model=MODEL,
+        input=[text],
+    )
+    return response.data[0].embedding
 
-def embed_text_local(text: str) -> list[float]:
-    return embedder.encode(text).tolist()
+# def embed_text_local(text: str) -> list[float]:
+#     return embedder.encode(text).tolist()
 
 def build_index():
     uid = 0
@@ -59,7 +58,7 @@ def build_index():
             if len(cleaned) < 30:
                 continue
 
-            vector = embed_text_local(cleaned)
+            vector = embed_text_openai(cleaned)
 
             index.add_item(uid, vector)
             metadata[uid] = {
