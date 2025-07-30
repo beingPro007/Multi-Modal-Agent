@@ -3,11 +3,11 @@ livekit-plugins-noise-cancellation~=0.2
 python-dotenv
 aiohttp>=3.8.0
 annoy
+tiktoken
 # sentence-transformers# for devs only in case of no openai key
 langchain>=0.2
 langchain-community>=0.0.15
 openai
-chromadb
-tavily-python
+langchain-chroma
 duckduckgo-search
-tiktoken
+langchain-tavily

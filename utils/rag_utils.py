@@ -1,44 +1,31 @@
 import os
-import pickle
-from pathlib import Path
-from annoy import AnnoyIndex
-import openai
 from dotenv import load_dotenv
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+from langchain_core.documents import Document
 
 load_dotenv()
 
-MODEL = "text-embedding-3-small"
-EMBED_DIM = 1536
+# --- Initialize OpenAI Embeddings + ChromaDB ---
+embedding_model = OpenAIEmbeddings()
+vector_db = Chroma(
+    persist_directory="./chroma_db",
+    embedding_function=embedding_model
+)
+
 TOP_K = 3
 
-INDEX_PATH = Path("rag_build/rag_index/index.annoy")
-METADATA_PATH = Path("rag_build/rag_index/metadata.pkl")
-
-index = AnnoyIndex(EMBED_DIM, "angular")
-index.load(str(INDEX_PATH))
-
-with open(METADATA_PATH, "rb") as f:
-    metadata = pickle.load(f)
-
-def embed_text_openai(text: str) -> list[float]:
-    response = openai.Embedding.create(
-        model=MODEL,
-        input=[text],
-    )
-    return response["data"][0]["embedding"]
-
+# --- Simple RAG Search Function ---
 def search_docs(query: str, top_k: int = TOP_K) -> str:
-    query_vector = embed_text_openai(query)
-    ids, distances = index.get_nns_by_vector(query_vector, top_k, include_distances=True)
-
-    results = []
-    for i, dist in zip(ids, distances):
-        meta = metadata.get(i, {})
-        source = meta.get("source_file", "unknown")
-        text = meta.get("text", "").strip()
-        results.append(f"From {source}:\n{text}\n")
+    results = vector_db.similarity_search(query, k=top_k)
 
     if not results:
         return "Sorry, I couldn’t find anything relevant."
 
-    return results[0]
+    formatted = []
+    for doc in results:
+        source = doc.metadata.get("source", "internal")
+        text = doc.page_content.strip()
+        formatted.append(f"From {source}:\n{text}\n")
+
+    return formatted[0]  # Return only top result for brevity
