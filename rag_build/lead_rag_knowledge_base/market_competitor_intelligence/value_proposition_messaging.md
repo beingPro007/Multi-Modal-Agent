@@ -53,4 +53,3 @@ This document outlines our core value propositions, providing Lead Agents with t
 * **Match Value Prop to Pain:** Select the value proposition that directly addresses their stated pain.
 * **Personalize with Examples:** Reference relevant customer success stories or industry trends to make the value tangible.
 * **Keep it Concise:** Deliver the core message quickly and clearly.
-* **Focus on Outcomes:** Emphasize the benefits and results, not just what the product does.

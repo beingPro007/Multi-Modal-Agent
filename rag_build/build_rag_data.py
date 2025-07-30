@@ -8,11 +8,6 @@ from typing import List, Dict
 
 # Load environment variables (e.g., OPENAI_API_KEY)
 load_dotenv()
-
-# --- Configuration for Knowledge Domains and Chroma DB ---
-
-# Define your knowledge base domains, their paths, desired collection names, and descriptions.
-# Ensure 'agent_tools_operations' is included as it was part of our agreed structure.
 KNOWLEDGE_DOMAINS = {
     "core_ai_system_info": {
         "path": "rag_build/lead_rag_knowledge_base/core_ai_system_info",
@@ -77,7 +72,6 @@ print("--- Starting Data Ingestion into Specialized Chroma Collections ---")
 for domain_name, config in KNOWLEDGE_DOMAINS.items():
     print(f"\nProcessing domain: '{domain_name}'")
     
-    # 1. Load documents specific to the current domain's folder
     docs_for_domain = load_md_files(config["path"])
 
     if not docs_for_domain:

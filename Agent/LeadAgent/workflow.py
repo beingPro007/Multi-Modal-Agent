@@ -8,28 +8,21 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AI
 from langchain.schema import Document
 from langgraph.graph import END, StateGraph, START
 
-# --- Import your custom routers ---
-from Agent.LeadAgent.primaryRouter import question_router # This is your top-level router
-from Agent.LeadAgent.secondaryRouter import vector_router # This is your domain-specific router
-
-# --- Other necessary imports ---
+from Agent.LeadAgent.primaryRouter import question_router
+from Agent.LeadAgent.secondaryRouter import vector_router 
 from Agent.LeadAgent.generate import format_docs, rag_chain
 from Agent.LeadAgent.questionRewriter import question_rewriter
+from Agent.LeadAgent.trustBenchMarking import trust_scorer
 
-# --- Import the pre-loaded specialized vectorstores ---
-# This is crucial for dynamic retrieval from specific domains.
 from Agent.LeadAgent.specialized_vectorstores.retriever import loaded_specialized_vectorstores
 
 load_dotenv()
 
-# `loaded_specialized_vectorstores` is a dictionary: {'domain_name': Chroma_instance}
-# We assign it directly to `retriever` for convenience in this file.
 retriever: Dict[str, Chroma] = loaded_specialized_vectorstores
 
 chat_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0) # For chitchat
 llm_for_generation = ChatOpenAI(model="gpt-4o", temperature=0) # For RAG generation
-web_search_tool = TavilySearch(k=3)
-
+web_search_tool = TavilySearch(k=2)
 
 class GraphState(TypedDict):
     messages: List[BaseMessage]
@@ -37,7 +30,7 @@ class GraphState(TypedDict):
     documents: List[Document]
     chosen_domain: str 
     chosen_route: str
-    lead_gen_action_type: str 
+    trust_score: float
 
 def _get_latest_human_query(messages: List[BaseMessage]) -> str:
     """Extracts the content of the latest HumanMessage from a list of messages."""
@@ -64,7 +57,7 @@ def chitchat(state: GraphState) -> GraphState:
     messages = state.get("messages", [])
     latest_user_query = _get_latest_human_query(messages)
     
-    chat_history_for_llm = format_messages_for_llm_context(messages[:-1]) # Exclude current query for chat history
+    chat_history_for_llm = format_messages_for_llm_context(messages[:-1])
     
     response = chat_llm.invoke([
         SystemMessage(content="You are a friendly and concise general assistant for our company. Respond conversationally to greetings or out-of-scope questions. Do not use markdown formatting. Politely guide the user back to company-related topics if the conversation veers too far."),
@@ -74,6 +67,7 @@ def chitchat(state: GraphState) -> GraphState:
     new_messages = messages + [AIMessage(content=response.content.strip())]
     
     return {
+        **state,
         "generation": response.content.strip(),
         "messages": new_messages,
         "documents": []
@@ -98,15 +92,15 @@ def retrieve(state: GraphState) -> GraphState:
     """
     print("---RETRIEVING DOCUMENTS FROM SPECIFIC DOMAIN---")
     messages = state["messages"]
-    chosen_domain = state.get("chosen_domain") # Get the chosen domain from the state
+    chosen_domain = state.get("chosen_domain")
 
     latest_user_query = _get_latest_human_query(messages)
     
     if not chosen_domain or chosen_domain not in retriever:
         print(f"Error: Invalid or un-loaded domain '{chosen_domain}' for retrieval. Returning empty documents.")
-        return {**state, "documents": []} # Return empty docs but keep other state
+        return {**state, "documents": []}
 
-    domain_retriever = retriever[chosen_domain].as_retriever(k=4) # k=4 documents
+    domain_retriever = retriever[chosen_domain].as_retriever(k=2)
 
     documents = domain_retriever.invoke(latest_user_query)
     print(f"Retrieved {len(documents)} documents from '{chosen_domain}' collection.")
@@ -134,24 +128,62 @@ def generate(state: GraphState) -> GraphState:
     print("---GENERATE---")
     messages = state["messages"]
     documents = state["documents"]
-    
+    curr_trust_score = state.get("trust_score", 0.0)
+
     latest_user_query = _get_latest_human_query(messages)
     
     docs_txt = format_docs(documents)
     
     if not docs_txt:
         print("No documents available for generation. Generating a fallback response.")
-        response = chat_llm.invoke([ # Use chat_llm for a general fallback response
+        response = chat_llm.invoke([
             SystemMessage(content="You are an AI Lead Agent assistant. You could not find specific information in your knowledge base or via web search for the user's request. Politely state that you cannot answer the question based on the available information and offer to help with other company-related queries."),
             HumanMessage(content=latest_user_query)
         ])
         generation = response.content.strip()
     else:
-        generation = rag_chain.invoke({"context": docs_txt, "question": latest_user_query})
+        generation = rag_chain.invoke({"messages": docs_txt, "question": latest_user_query, "trust_score": curr_trust_score})
     
     new_messages = messages + [AIMessage(content=generation)]
     
     return {**state, "messages": new_messages, "generation": generation}
+
+def trust_evaluator(state: GraphState) -> GraphState:
+    print("---Evaluating the Trust Score---")
+    messages = state.get("messages", [])
+    generation = state.get("generation", "")
+    
+    score = trust_scorer.invoke({"generation": generation, "messages": messages}).score
+
+    print(f"Trust Score Evaluated: {score}")
+    
+    if score >= 0.5:
+        print("---------------Fetching User Email--------------")
+        print("---------------Email Sent--------------")
+
+    return {**state, "trust_score": score}
+ 
+def escalate_to_human_agent(state: GraphState) -> GraphState:
+    print("---ESCALATING TO HUMAN AGENT---")
+    messages = state["messages"]
+    latest_user_query = _get_latest_human_query(messages)
+
+    escalation_message = (
+        "I apologize, but I'm unable to fully assist with that request at the moment. "
+        "I'm connecting you with a human expert who can provide more in-depth support. "
+        "Please hold while I transfer you."
+    )
+
+    new_messages = messages + [AIMessage(content=escalation_message)]
+
+    print("Escalation triggered. (In a real system, this would involve API calls to a human agent platform).")
+
+    return {
+        **state,
+        "generation": escalation_message,
+        "messages": new_messages,
+        "documents": []
+    }
 
 def transform_query(state: GraphState) -> GraphState:
     """
@@ -188,20 +220,19 @@ def web_search(state: GraphState) -> GraphState:
         print(f"Error during web search: {e}. Returning empty documents.")
         return {**state, "documents": []}
 
-
 def leadAgent_workflow():
     workflow = StateGraph(GraphState)
 
-    workflow.add_node("route_question", route_question) # Primary Router Node
+    workflow.add_node("route_question", route_question)
     workflow.add_node("chitchat", chitchat)
     workflow.add_node("web_search", web_search)
-    workflow.add_node("secondary_router_node", secondary_router_node) # Node for the secondary router
+    workflow.add_node("secondary_router_node", secondary_router_node)
     workflow.add_node("retrieve", retrieve)
     workflow.add_node("generate", generate)
     workflow.add_node("transform_query", transform_query)
-    
-    workflow.add_edge(START, "route_question")
+    workflow.add_node("trust_score", trust_evaluator)
 
+    workflow.add_edge(START, "route_question")
     workflow.add_conditional_edges(
         "route_question",
         lambda state: state["chosen_route"],
@@ -211,26 +242,23 @@ def leadAgent_workflow():
             "vectorstore": "secondary_router_node"
         },
     )
-
     workflow.add_edge("chitchat", END)
-    
     workflow.add_edge("web_search", "generate") 
-
     workflow.add_edge("secondary_router_node", "retrieve")
-
     workflow.add_edge("retrieve", "generate")
 
-    
     workflow.add_conditional_edges(
         "generate",
-        lambda state: "transform_and_retry" if not state.get("documents") else "end",
+        lambda state: "transform_query" if not state.get("documents") else "trust_score",
         {
-            "end": END,
-            # "transform_and_retry": "transform_query",
-            "transform_and_retry": END
+            "transform_query": "transform_query",
+            "trust_score": "trust_score",
         },
     )
-    
-    workflow.add_edge("transform_query", "retrieve")
 
+    
+    workflow.add_edge("transform_query", "retrieve") 
+    workflow.add_edge("generate", "trust_score")
+    workflow.add_edge("trust_score", END)
+    
     return workflow.compile()

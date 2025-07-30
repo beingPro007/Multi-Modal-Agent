@@ -19,15 +19,10 @@ class RouteQuery(BaseModel):
         description="Given a user question choose to route it to web search, vectorstore or straight chitchat.",
     )
 
-# Initialize the LLM for the router
-# Using gpt-4o-mini as specified, good for cost and speed for routing
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
-# Apply structured output to the LLM
-# This forces the LLM to output a Pydantic object (RouteQuery)
 structured_llm_router = llm.with_structured_output(RouteQuery)
 
-# Define the system prompt with your updated instructions and examples
 system_prompt_content = """
 You are an expert router that assigns each user question to exactly one of three data sources:
 
