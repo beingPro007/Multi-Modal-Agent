@@ -37,8 +37,7 @@ class GraphState(TypedDict):
     documents: List[Document]
     chosen_domain: str 
     chosen_route: str
-
-# --- Helper Functions ---
+    lead_gen_action_type: str 
 
 def _get_latest_human_query(messages: List[BaseMessage]) -> str:
     """Extracts the content of the latest HumanMessage from a list of messages."""
@@ -58,11 +57,7 @@ def format_messages_for_llm_context(messages: List[BaseMessage]) -> str:
             formatted_str += f"User: {msg.content.strip()}\n"
         elif isinstance(msg, AIMessage):
             formatted_str += f"Assistant: {msg.content.strip()}\n"
-        # SystemMessage content might be included if desired for full history context
     return formatted_str.strip()
-
-
-# --- LangGraph Nodes (Functions) ---
 
 def chitchat(state: GraphState) -> GraphState:
     print("---CHITCHAT / GENERAL CONVERSATION---")
@@ -86,17 +81,15 @@ def chitchat(state: GraphState) -> GraphState:
     
 def secondary_router_node(state: GraphState) -> GraphState:
     print("--SECONDARY ROUTER---")
-    messages = state["messages"] # Access messages from state
+    messages = state["messages"]
     
     latest_user_query = _get_latest_human_query(messages)
 
-    # Correct syntax for invoke and correct attribute to get the domain
     response = vector_router.invoke({"question": latest_user_query})
     chosen_domain = response.datasource # Access the 'datasource' attribute from the Pydantic model
     
     print(f"Secondary router chose domain: '{chosen_domain}'")
     
-    # Correctly update the state, preserving existing fields
     return {**state, "chosen_domain": chosen_domain}
     
 def retrieve(state: GraphState) -> GraphState:
@@ -109,18 +102,15 @@ def retrieve(state: GraphState) -> GraphState:
 
     latest_user_query = _get_latest_human_query(messages)
     
-    # Check if the chosen_domain is valid and loaded
     if not chosen_domain or chosen_domain not in retriever:
         print(f"Error: Invalid or un-loaded domain '{chosen_domain}' for retrieval. Returning empty documents.")
         return {**state, "documents": []} # Return empty docs but keep other state
 
-    # Get the retriever for the SPECIFIC chosen domain from the loaded_specialized_vectorstores dictionary
     domain_retriever = retriever[chosen_domain].as_retriever(k=4) # k=4 documents
 
     documents = domain_retriever.invoke(latest_user_query)
     print(f"Retrieved {len(documents)} documents from '{chosen_domain}' collection.")
     
-    # Update documents in state, preserve other state fields
     return {**state, "documents": documents} 
 
 def route_question(state: GraphState) -> Literal["chitchat", "web_search", "vectorstore"]:
@@ -143,15 +133,13 @@ def generate(state: GraphState) -> GraphState:
     
     print("---GENERATE---")
     messages = state["messages"]
-    documents = state["documents"] # These can be from retrieve or web_search
+    documents = state["documents"]
     
     latest_user_query = _get_latest_human_query(messages)
     
-    # Context for the RAG chain should include retrieved documents
-    docs_txt = format_docs(documents) # Your helper function from generate.py
+    docs_txt = format_docs(documents)
     
-    # Fallback if no documents are found (e.g., retrieval failed or web search yielded nothing)
-    if not docs_txt: # Check if format_docs returns empty string if documents list is empty
+    if not docs_txt:
         print("No documents available for generation. Generating a fallback response.")
         response = chat_llm.invoke([ # Use chat_llm for a general fallback response
             SystemMessage(content="You are an AI Lead Agent assistant. You could not find specific information in your knowledge base or via web search for the user's request. Politely state that you cannot answer the question based on the available information and offer to help with other company-related queries."),
@@ -159,13 +147,10 @@ def generate(state: GraphState) -> GraphState:
         ])
         generation = response.content.strip()
     else:
-        # Use the powerful LLM for final RAG generation
         generation = rag_chain.invoke({"context": docs_txt, "question": latest_user_query})
     
-    # Update messages in state for conversation history with the AI's response
     new_messages = messages + [AIMessage(content=generation)]
     
-    # Correctly update the state, preserving existing fields
     return {**state, "messages": new_messages, "generation": generation}
 
 def transform_query(state: GraphState) -> GraphState:
@@ -176,16 +161,12 @@ def transform_query(state: GraphState) -> GraphState:
     messages = state["messages"]
     latest_user_query = _get_latest_human_query(messages)
     
-    # Use question_rewriter to get a better question
     better_question = question_rewriter.invoke({"question": latest_user_query})
     
-    # Append the new, rephrased question as a HumanMessage to the messages list
-    # The next retrieval step will use this new message.
     new_messages = messages + [HumanMessage(content=better_question, name="rewritten_query")]
     print(f"Original query: '{latest_user_query}'")
     print(f"Transformed query: '{better_question}'")
     
-    # Correctly update the state, preserving existing fields
     return {**state, "messages": new_messages}
 
 def web_search(state: GraphState) -> GraphState:
@@ -202,7 +183,6 @@ def web_search(state: GraphState) -> GraphState:
         web_doc = Document(page_content=web_results, metadata={"source": "web_search"})
         print(f"Web search retrieved {len(docs)} results.")
         
-        # Pass the web results as documents for subsequent generation
         return {**state, "documents": [web_doc]}
     except Exception as e:
         print(f"Error during web search: {e}. Returning empty documents.")
@@ -212,7 +192,6 @@ def web_search(state: GraphState) -> GraphState:
 def leadAgent_workflow():
     workflow = StateGraph(GraphState)
 
-    # Add Nodes
     workflow.add_node("route_question", route_question) # Primary Router Node
     workflow.add_node("chitchat", chitchat)
     workflow.add_node("web_search", web_search)
@@ -255,47 +234,3 @@ def leadAgent_workflow():
     workflow.add_edge("transform_query", "retrieve")
 
     return workflow.compile()
-
-# # Compile and run the workflow
-# if __name__ == "__main__":
-#     app = leadAgent_workflow()
-
-#     # Example Usage
-#     print("\n--- Running Lead Agent Workflow ---")
-    
-#     print("\n--- TEST 1: Pricing Query (Primary: Vectorstore -> Secondary: core_ai_system_info -> Retrieve -> Generate) ---")
-#     inputs1 = {"messages": [HumanMessage(content="What are the pricing plans for AI-vengers professional tier?")]}
-#     # Stream the output
-#     for s in app.stream(inputs1):
-#         print(s)
-#     print("\n--- End TEST 1 ---")
-
-#     print("\n--- TEST 2: General Greeting (Primary: Chitchat -> End) ---")
-#     inputs2 = {"messages": [HumanMessage(content="Hello there! How are you doing today?")]}
-#     for s in app.stream(inputs2):
-#         print(s)
-#     print("\n--- End TEST 2 ---")
-
-#     print("\n--- TEST 3: Recent News (Primary: Web Search -> Generate -> End) ---")
-#     inputs3 = {"messages": [HumanMessage(content="What are the latest developments in large language models in July 2025?")]}
-#     for s in app.stream(inputs3):
-#         print(s)
-#     print("\n--- End TEST 3 ---")
-
-#     print("\n--- TEST 4: Lead Gen Strategy (Primary: Vectorstore -> Secondary: lead_generate_strategies -> Retrieve -> Generate) ---")
-#     inputs4 = {"messages": [HumanMessage(content="What are best practices for qualifying inbound leads?")]}
-#     for s in app.stream(inputs4):
-#         print(s)
-#     print("\n--- End TEST 4 ---")
-
-#     print("\n--- TEST 5: Obscure Query (Primary: Vectorstore -> Secondary: ? -> Retrieve (empty) -> Transform -> Retrieve -> Generate (fallback)) ---")
-#     inputs5 = {"messages": [HumanMessage(content="Tell me about the specific features of your obscure product X that nobody knows about.")]}
-#     for s in app.stream(inputs5):
-#         print(s)
-#     print("\n--- End TEST 5 ---")
-
-#     print("\n--- TEST 6: How do I set up Twilio? (Primary: Vectorstore -> Secondary: agent_tools_operations -> Retrieve -> Generate) ---")
-#     inputs6 = {"messages": [HumanMessage(content="How do I set up Twilio for an agent?")]}
-#     for s in app.stream(inputs6):
-#         print(s)
-#     print("\n--- End TEST 6 ---")
