@@ -4,3 +4,6 @@ inbound-trunk.json
 KMS
 __pycache__/
 Agent/__pycache__/
+chroma_db
+chroma_db/chroma.sqlite3
+chroma_db/chroma.sqlite3

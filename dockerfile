@@ -18,10 +18,8 @@ RUN apt-get update && \
     curl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment
 RUN python3 -m venv /app/venv
 
-# Activate venv by adding to PATH
 ENV PATH="/app/venv/bin:$PATH"
 
 COPY requirements.txt .
@@ -34,10 +32,4 @@ RUN python rag_build/build_rag_data.py
 
 RUN python agent.py download-files
 
-COPY entrypoint.sh /app/entrypoint.sh
-
-RUN chmod +x /app/entrypoint.sh
-
-ENTRYPOINT ["/app/entrypoint.sh"]
-
-CMD ["python" "agent.py" "dev"]
+CMD [ "bash" ]

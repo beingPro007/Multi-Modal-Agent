@@ -72,12 +72,14 @@ class MyLangGraphStream(llm.LLMStream):
             self._config,
             stream_mode="updates",
         ):
-            if "generate" in state_update:
-                generated_content = state_update["generate"].get("generation")
-                if generated_content:
-                    chat_chunk = _to_chat_chunk(generated_content)
-                    if chat_chunk:
-                        self._event_ch.send_nowait(chat_chunk)
+            for key in ["generate", "chitchat"]:
+                if key in state_update:
+                    generated_content = state_update[key].get("generation")
+                    if generated_content:
+                        chat_chunk = _to_chat_chunk(generated_content)
+                        if chat_chunk:
+                            self._event_ch.send_nowait(chat_chunk)
+
 
 class MyLLMAdapter(llm.LLM):
     def __init__(

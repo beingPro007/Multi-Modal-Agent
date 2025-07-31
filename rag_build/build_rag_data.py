@@ -1,83 +1,133 @@
-#!/usr/bin/env python3
-
-import os
-import pickle
-import textwrap
-from pathlib import Path
 from dotenv import load_dotenv
-from annoy import AnnoyIndex
+from pathlib import Path
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.vectorstores import Chroma
+from typing import List, Dict
 
+# Load environment variables (e.g., OPENAI_API_KEY)
 load_dotenv()
+KNOWLEDGE_DOMAINS = {
+    "core_ai_system_info": {
+        "path": "rag_build/lead_rag_knowledge_base/core_ai_system_info",
+        "collection_name": "core_ai_system_info_collection",
+        "description": "Information about AI-vengers system features, customization, LLM integration, pricing, and hosting options."
+    },
+    "lead_generate_strategies": {
+        "path": "rag_build/lead_rag_knowledge_base/lead_generate_strategies",
+        "collection_name": "lead_generation_strategies_collection",
+        "description": "Strategies for lead generation, qualification, nurturing, follow-up, closing techniques, objection handling, inbound and outbound tactics, and CRM usage."
+    },
+    "sales_enablement_support": {
+        "path": "rag_build/lead_rag_knowledge_base/sales_enablement_support",
+        "collection_name": "sales_enablement_support_collection",
+        "description": "Resources for sales playbooks, common customer pain points, success stories, competitor overviews, product updates, FAQs, and sales tech stack guides."
+    },
+    "market_competitor_intelligence": {
+        "path": "rag_build/lead_rag_knowledge_base/market_competitor_intelligence",
+        "collection_name": "market_competitor_intelligence_collection",
+        "description": "Analysis of industry trends, deep dives into competitors, market segmentation, value proposition messaging, and ideal customer profile definitions."
+    },
+    "agent_performance_development": {
+        "path": "rag_build/lead_rag_knowledge_base/agent_performance_development",
+        "collection_name": "agent_performance_development_collection",
+        "description": "Metrics for agent performance, common challenges, onboarding checklists, and guides for feedback and coaching."
+    },
+    "compliance_data_security": {
+        "path": "rag_build/lead_rag_knowledge_base/compliance_data_security",
+        "collection_name": "compliance_data_security_collection",
+        "description": "Policies and guidelines related to data privacy, security, and regulatory compliance for handling sensitive information."
+    },
+}
 
-CHUNK_SIZE = 500
-EMBED_DIM = 384  # Because all-MiniLM-L6-v2 outputs 384-dim vectors
+CHROMA_PERSIST_DIRECTORY = "./chroma_db"
+ROUTING_COLLECTION_NAME = "knowledge_domain_routing"
 
-BASE_DIR = Path(__file__).parent
-DATA_DIR = BASE_DIR / "lead_rag_knowledge_base"
-OUT_DIR = BASE_DIR / "rag_index"
-OUT_DIR.mkdir(parents=True, exist_ok=True)
+Path(CHROMA_PERSIST_DIRECTORY).mkdir(parents=True, exist_ok=True)
 
-INDEX_FILE = OUT_DIR / "index.annoy"
-METADATA_FILE = OUT_DIR / "metadata.pkl"
 
-# from sentence_transformers import SentenceTransformer
-# embedder = SentenceTransformer("all-MiniLM-L6-v2")
+def load_md_files(folder_path: str) -> List[Document]:
+    """
+    Loads all Markdown files from a given folder and its subfolders.
+    """
+    files = Path(folder_path).rglob("*.md")
+    docs = []
+    for file in files:
+        try:
+            content = file.read_text(encoding='utf-8')
+            docs.append(Document(page_content=content, metadata={"source": str(file)}))
+        except Exception as e:
+            print(f"Error reading file {file}: {e}")
+    print(f"Loaded {len(docs)} documents from {folder_path}")
+    return docs
 
-from openai import OpenAI
-client = OpenAI()
-MODEL = "text-embedding-3-small"
-EMBED_DIM = 1536
+splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+embedding_model = OpenAIEmbeddings(model="text-embedding-3-small") # Explicitly define the model for clarity
 
-def embed_text_openai(text: str) -> list[float]:
-    response = client.embeddings.create(
-        model=MODEL,
-        input=[text],
-    )
-    return response.data[0].embedding
+specialized_vectorstores: Dict[str, Chroma] = {}
 
-# def embed_text_local(text: str) -> list[float]:
-#     return embedder.encode(text).tolist()
+print("--- Starting Data Ingestion into Specialized Chroma Collections ---")
 
-def build_index():
-    uid = 0
-    index = AnnoyIndex(EMBED_DIM, "angular")
-    metadata = {}
+for domain_name, config in KNOWLEDGE_DOMAINS.items():
+    print(f"\nProcessing domain: '{domain_name}'")
+    
+    docs_for_domain = load_md_files(config["path"])
 
-    md_files = list(DATA_DIR.glob("*.md"))
-    if not md_files:
-        print("❌ No .md files found in rag_knowledge_base/")
-        return
+    if not docs_for_domain:
+        print(f"No Markdown documents found in '{config['path']}'. Skipping this domain.")
+        continue
 
-    for file in md_files:
-        with open(file, "r", encoding="utf-8") as f:
-            content = f.read()
+    split_docs_for_domain = splitter.split_documents(docs_for_domain)
+    print(f"Split {len(docs_for_domain)} documents into {len(split_docs_for_domain)} chunks for '{domain_name}'.")
 
-        chunks = textwrap.wrap(content, width=CHUNK_SIZE, break_long_words=False)
-        for chunk in chunks:
-            cleaned = chunk.strip()
-            if len(cleaned) < 30:
-                continue
+    try:
+        vectorstore_domain = Chroma.from_documents(
+            documents=split_docs_for_domain,
+            embedding=embedding_model,
+            persist_directory=CHROMA_PERSIST_DIRECTORY,
+            collection_name=config["collection_name"] # KEY CHANGE: Assign specific collection name
+        )
+        specialized_vectorstores[domain_name] = vectorstore_domain
+        print(f"Successfully ingested/updated data for collection: '{config['collection_name']}'")
+    except Exception as e:
+        print(f"Error creating/updating vectorstore for {domain_name} ({config['collection_name']}): {e}")
 
-            vector = embed_text_openai(cleaned)
+print("\n--- All specialized knowledge base collections processed. ---")
 
-            index.add_item(uid, vector)
-            metadata[uid] = {
-                "source_file": file.name,
-                "text": cleaned,
+
+print("\n--- Creating/Updating the Routing Vector Database ---")
+routing_docs = []
+for domain_name, config in KNOWLEDGE_DOMAINS.items():
+    routing_docs.append(
+        Document(
+            page_content=config["description"],
+            metadata={
+                "domain_name": domain_name,
+                "collection_name": config["collection_name"]
             }
-            uid += 1
+        )
+    )
 
-    index.build(10)
-    index.save(str(INDEX_FILE))
+if not routing_docs:
+    print("Warning: No routing documents were generated. Check KNOWLEDGE_DOMAINS configuration.")
+else:
+    try:
+        routing_vectorstore = Chroma.from_documents(
+            documents=routing_docs,
+            embedding=embedding_model,
+            persist_directory=CHROMA_PERSIST_DIRECTORY,
+            collection_name=ROUTING_COLLECTION_NAME
+        )
+        print(f"Routing vector database created/updated in collection: '{ROUTING_COLLECTION_NAME}'")
+    except Exception as e:
+        print(f"Error creating/updating routing vectorstore: {e}")
 
-    with open(METADATA_FILE, "wb") as f:
-        pickle.dump(metadata, f)
+print("\n--- Vector database setup complete for both specialized content and routing. ---")
 
-    print(f"✅ RAG index built successfully!")
-    print(f"📄 {uid} chunks indexed from {len(md_files)} files")
-    print(f"🧠 Annoy index saved at: {INDEX_FILE}")
-    print(f"📚 Metadata saved at: {METADATA_FILE}")
-
-
-if __name__ == "__main__":
-    build_index()
+# You can now conceptually think of how you would access these:
+# # To get a retriever for a specific domain (e.g., Lead Generation):
+# lead_gen_retriever = specialized_vectorstores["lead_generate_strategies"].as_retriever()
+#
+# # To get the retriever for the routing logic:
+# routing_retriever = routing_vectorstore.as_retriever()
