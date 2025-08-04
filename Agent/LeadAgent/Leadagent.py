@@ -27,7 +27,7 @@ class LeadAgent(Agent):
             llm=MyLLMAdapter(
                 graph=leadAgent_workflow()
             ),
-            tts=aws.TTS(voice="Matthew", speech_engine="generative", language="en-US")
+            tts=aws.TTS(voice="Matthew", speech_engine="neural", language="en-US")
         )
 
     async def on_enter(self):

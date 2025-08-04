@@ -4,11 +4,12 @@ from livekit.plugins import deepgram, silero, openai, noise_cancellation, aws
 from Agent.LeadAgent.Leadagent import LeadAgent
 from dotenv import load_dotenv
 import logging
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
         
 async def entrypoint(ctx: JobContext):
+    print("Entrypoint called....")
     session = AgentSession(
             vad=ctx.proc.userdata["vad"],
             # turn_detection=EnglishModel()
