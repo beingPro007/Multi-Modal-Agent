@@ -111,7 +111,6 @@ class MyLLMAdapter(llm.LLM):
             config=self._config,
         )
 
-    # This method was originally in LangGraphStream, moved here as discussed
     def _chat_ctx_to_state(self, chat_ctx: ChatContext) -> dict[str, Any]:
         messages: list[AIMessage | HumanMessage | SystemMessage] = []
         for item in chat_ctx.items:

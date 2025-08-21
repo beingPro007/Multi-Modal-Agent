@@ -256,7 +256,6 @@ def leadAgent_workflow():
         },
     )
 
-    
     workflow.add_edge("transform_query", "retrieve") 
     workflow.add_edge("generate", "trust_score")
     workflow.add_edge("trust_score", END)
