@@ -2,6 +2,9 @@
 venv/
 __pycache__/
 
+# Node artifacts
+node_modules/
+
 # Local environment & config files
 .env
 .env.local
@@ -24,7 +27,8 @@ Dockerfile*
 .idea
 .vscode
 
+# Project-specific
 aiVengers-frontend/
-agent-server
-chroma_db
-KMS
+agent-server/
+chroma_db/
+KMS/
