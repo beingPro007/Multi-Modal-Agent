@@ -1,16 +1,20 @@
-AGENT_TYPE=${AGENT_TYPE:-default}
+#!/bin/bash
 
-echo "Starting container with AGENT_TYPE=$AGENT_TYPE"
+AGENT_NAME=${AGENT_NAME:-LeadAgent}
+echo "🚀 Starting agent: $AGENT_NAME"
 
-case "$AGENT_TYPE" in
-  default)
-    exec python agent.py dev"$@"
+case "$AGENT_NAME" in
+  LeadAgent)
+    python Agent/LeadAgent/LeadAgent.py start
     ;;
-  lead)
-    exec python leadagent.py dev"$@"
+  SalesAgent)
+    python Agent/SalesAgent/SalesAgent.py start
+    ;;
+  SupportAgent)
+    python Agent/SupportAgent/SupportAgent.py start
     ;;
   *)
-    echo "Unknown AGENT_TYPE: $AGENT_TYPE"
+    echo "❌ Unknown agent: $AGENT_NAME"
     exit 1
     ;;
 esac
