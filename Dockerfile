@@ -1,18 +1,13 @@
-# This is an example Dockerfile that builds a minimal container for running LK Agents
 # syntax=docker/dockerfile:1
 ARG PYTHON_VERSION=3.11.6
 FROM python:${PYTHON_VERSION}-slim
 
-# Keeps Python from buffering stdout and stderr to avoid situations where
-# the application crashes without emitting any logs due to buffering.
 ENV PYTHONUNBUFFERED=1
 
-# Define the program entrypoint file where your agent is started.
 ARG PROGRAM_MAIN="leadAgent.py"
-
-# Create a non-privileged user that the app will run under.
-# See https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#user
 ARG UID=10001
+
+# Create non-privileged user
 RUN adduser \
     --disabled-password \
     --gecos "" \
@@ -21,32 +16,38 @@ RUN adduser \
     --uid "${UID}" \
     appuser
 
-
-# Install gcc and other build dependencies.
+# Install build dependencies
 RUN apt-get update && \
-    apt-get install -y \
-    gcc \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+    apt-get install -y gcc python3-dev && \
+    rm -rf /var/lib/apt/lists/*
 
-USER appuser
-
-RUN mkdir -p /home/appuser/.cache
-RUN chown -R appuser /home/appuser/.cache
+# Create RAG build directories as root and give appuser ownership
+RUN mkdir -p /home/appuser/rag_build/chroma_db && \
+    chown -R ${UID}:${UID} /home/appuser/rag_build
 
 WORKDIR /home/appuser
 
+# Copy requirements and install
 COPY requirements.txt .
-RUN python -m pip install --user --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir -r requirements.txt
 
+# Copy all application code
 COPY . .
 
-# ensure that any dependent models are downloaded at build-time
-# RUN python "$PROGRAM_MAIN" download-files
+# ---- Build-time API keys ----
+ARG OPENAI_API_KEY
+ARG TAVILY_API_KEY
+ENV OPENAI_API_KEY=${OPENAI_API_KEY}
+ENV TAVILY_API_KEY=${TAVILY_API_KEY}
 
-# expose healthcheck port
+# Switch to non-privileged user
+USER appuser
+
+# Build RAG data at build time
+# RUN python rag_build/build_rag_data.py
+
+# Expose LiveKit healthcheck port
 EXPOSE 8081
 
-# Run the application.
-# The "start" command tells the worker to connect to LiveKit and begin waiting for jobs.
-CMD ["python", "leadAgent.py", "start"]
+# Start the agent at runtime
+CMD ["sh", "-c", "python rag_build/build_rag_data.py & python leadAgent.py start"]

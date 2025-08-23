@@ -29,6 +29,12 @@ Dockerfile*
 
 # Project-specific
 aiVengers-frontend/
+<<<<<<< HEAD
 agent-server/
 chroma_db/
 KMS/
+=======
+agent-server
+KMS
+chroma_db
+>>>>>>> 4110e38 (refactor: streamline agent initialization and improve workflow structure; update Dockerfile for better build process)

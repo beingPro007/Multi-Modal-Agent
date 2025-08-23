@@ -11,7 +11,6 @@ load_dotenv()
         
 async def entrypoint(ctx: JobContext):
     print("Entrypoint called....")
-    
     session = AgentSession(
             vad=ctx.proc.userdata["vad"],
             # turn_detection=EnglishModel()

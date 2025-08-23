@@ -40,7 +40,7 @@ KNOWLEDGE_DOMAINS = {
         "description": "Information on API integrations, troubleshooting common technical issues, and best practices for version control of agent assets."
     },
 }
-CHROMA_PERSIST_DIRECTORY = "./chroma_db"
+CHROMA_PERSIST_DIRECTORY = "/home/appuser/rag_build/chroma_db"
 
 embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
 
