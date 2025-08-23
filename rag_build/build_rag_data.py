@@ -6,8 +6,10 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from typing import List, Dict
 
-# Load environment variables (e.g., OPENAI_API_KEY)
 load_dotenv()
+import os
+print("Using OPENAI_API_KEY:", os.getenv("OPENAI_API_KEY"))
+
 KNOWLEDGE_DOMAINS = {
     "core_ai_system_info": {
         "path": "rag_build/lead_rag_knowledge_base/core_ai_system_info",
@@ -41,11 +43,10 @@ KNOWLEDGE_DOMAINS = {
     },
 }
 
-CHROMA_PERSIST_DIRECTORY = "./chroma_db"
+CHROMA_PERSIST_DIRECTORY = "/home/appuser/rag_build/chroma_db"
 ROUTING_COLLECTION_NAME = "knowledge_domain_routing"
 
 Path(CHROMA_PERSIST_DIRECTORY).mkdir(parents=True, exist_ok=True)
-
 
 def load_md_files(folder_path: str) -> List[Document]:
     """
@@ -63,7 +64,7 @@ def load_md_files(folder_path: str) -> List[Document]:
     return docs
 
 splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
-embedding_model = OpenAIEmbeddings(model="text-embedding-3-small") # Explicitly define the model for clarity
+embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
 
 specialized_vectorstores: Dict[str, Chroma] = {}
 
@@ -86,10 +87,10 @@ for domain_name, config in KNOWLEDGE_DOMAINS.items():
             documents=split_docs_for_domain,
             embedding=embedding_model,
             persist_directory=CHROMA_PERSIST_DIRECTORY,
-            collection_name=config["collection_name"] # KEY CHANGE: Assign specific collection name
+            collection_name=config["collection_name"]
         )
         specialized_vectorstores[domain_name] = vectorstore_domain
-        print(f"Successfully ingested/updated data for collection: '{config['collection_name']}'")
+        print(f"Vectors stored in: {CHROMA_PERSIST_DIRECTORY}, Collection: {config['collection_name']}")
     except Exception as e:
         print(f"Error creating/updating vectorstore for {domain_name} ({config['collection_name']}): {e}")
 
@@ -124,10 +125,3 @@ else:
         print(f"Error creating/updating routing vectorstore: {e}")
 
 print("\n--- Vector database setup complete for both specialized content and routing. ---")
-
-# You can now conceptually think of how you would access these:
-# # To get a retriever for a specific domain (e.g., Lead Generation):
-# lead_gen_retriever = specialized_vectorstores["lead_generate_strategies"].as_retriever()
-#
-# # To get the retriever for the routing logic:
-# routing_retriever = routing_vectorstore.as_retriever()
