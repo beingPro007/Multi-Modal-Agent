@@ -6,7 +6,6 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from typing import List, Dict
 
-# Load environment variables (e.g., OPENAI_API_KEY)
 load_dotenv()
 import os
 print("Using OPENAI_API_KEY:", os.getenv("OPENAI_API_KEY"))

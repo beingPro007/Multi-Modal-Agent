@@ -20,6 +20,7 @@ chat_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 llm_for_generation = ChatOpenAI(model="gpt-4o", temperature=0)
 web_search_tool = TavilySearch(k=2)
 
+
 class GraphState(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
     generation: Annotated[str, "The generated text"]
