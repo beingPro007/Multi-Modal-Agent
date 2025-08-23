@@ -21,7 +21,5 @@ llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
 
 rag_chain = prompt | llm | StrOutputParser()
 
-rag_chain = prompt | llm | StrOutputParser()
-
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
