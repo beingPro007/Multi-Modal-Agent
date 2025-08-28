@@ -32,5 +32,5 @@ class LeadAgent(Agent):
 
     async def on_enter(self):
         await self.session.say(
-            "Hi there! I'm Matthew, calling from AI‑vengers. To give you a personalized demo, may I know your company name"
+            "Hi there! I'm Matthew, calling from AI‑vengers. What's your name?"
         )

@@ -35,5 +35,5 @@ def prewarm(proc: JobProcess):
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(
         prewarm_fnc=prewarm,
-        entrypoint_fnc=entrypoint
+        entrypoint_fnc=entrypoint,
     ))
